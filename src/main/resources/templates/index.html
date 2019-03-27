@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <script src="/webjars/jquery/3.3.1-2/jquery.min.js"></script>
+    <script src="/webjars/Semantic-UI/2.4.1/semantic.min.js"></script>
+    <link rel="stylesheet" href="/webjars/Semantic-UI/2.4.1/semantic.min.css">
+    <title>환율 계산기</title>
+</head>
+<body class="ui grid" style="margin: 30px">
+
+<div class="ui container">
+    <div class="ui form eight wide column">
+        <h3 class="ui dividing header">환율 계산</h3>
+        <div class="field">
+            <label>송금국가</label>
+            <div class="field">
+                <select id="sendingCountry" class="ui compact selection dropdown">
+                    <option selected value="USD">미국(USD)</option>
+                    <option value="AUD">호주(AUD)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field">
+            <label>수취국가</label>
+            <div class="field">
+                <select id="receivingCountry" class="ui compact selection dropdown">
+                    <option selected value="KRW">한국(KRW)</option>
+                    <option value="JPY">일본(JPY)</option>
+                    <option value="PHP">필리핀(PHP)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field">
+            <label>환율</label>
+            <div class="field">
+                <span id="exchangeRate"></span>
+            </div>
+        </div>
+
+        <div class="field">
+            <label>송금액 </label>
+            <div class="inline fields">
+                <div class="field">
+                <input type="number" id="sendingAmount">
+                </div>
+                <div class="field">
+                    <span id="sendingAmountCurrency">USD</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="field">
+            <button type="button" onclick="getReceivingAmount()" class="ui secondary button">Submit</button>
+        </div>
+
+        <div id="submitResponse" class="ui field form success">
+        </div>
+    </div>
+</div>
+</body>
+
+
+<script>
+    $('select.dropdown')
+        .dropdown()
+    ;
+    $(window).on('load', getExchangeRate());
+    $('select').on('change', function () {
+        getExchangeRate();
+    });
+
+    function getExchangeRate() {
+        var sendingCountry = $('#sendingCountry').val();
+        var receivingCountry = $('#receivingCountry').val();
+
+        $.ajax({
+            url: "/api/exchange-rate?sendingCountry=" + sendingCountry + "&receivingCountry=" + receivingCountry,
+            type: "GET",
+            success: function (exchangeRate) {
+                $('#exchangeRate').text(exchangeRate + " " + receivingCountry + "/" + sendingCountry);
+                $('#sendingAmountCurrency').text(sendingCountry);
+                $('#submitResponse').html("");
+            },
+            error: function (jqXHR) {
+                if (jqXHR.status === 400) {
+                    alert("입력값이 올바르지 않습니다.");
+                } else if (jqXHR.status === 500) {
+                    alert("서버의 문제가 발생했습니다.");
+                }
+            }
+        });
+    }
+
+    function isInvalidInput() {
+        var amount = $('#sendingAmount').val();
+        return (amount.length <= 0 || amount < 0 || amount > 10000);
+    }
+
+    function getReceivingAmount() {
+        var sendingCountry = $('#sendingCountry').val();
+        var receivingCountry = $('#receivingCountry').val();
+        var sendingAmount = $('#sendingAmount').val();
+
+        if (isInvalidInput()) {
+            $('#submitResponse').html("<div class=\"ui error message\"><p>송금액이 바르지 않습니다</p></div>");
+            $('#submitResponse').attr('class', 'ui field form error');
+            return;
+        }
+
+        $.ajax({
+            url: "/api/receiving-amount?sendingCountry=" + sendingCountry
+                + "&receivingCountry=" + receivingCountry
+                + "&amount=" + sendingAmount,
+            type: "GET",
+            success: function (responseMap) {
+                $('#submitResponse').html("<div class=\"ui success message\">" +
+                    "<p>수취금액은 " + responseMap.receivingAmount + " " + receivingCountry + "/USD 입니다.</p>" +
+                    "</div>");
+                $('#exchangeRate').text(responseMap.exchangeRate + " " + receivingCountry + "/" + sendingCountry);
+                $('#submitResponse').attr('class', 'ui field form success');
+            },
+            error: function (jqXHR) {
+                if (jqXHR.status === 400) {
+                    alert("입력값이 올바르지 않습니다.");
+                } else if (jqXHR.status === 500) {
+                    alert("서버의 문제가 발생했습니다.");
+                }
+            }
+        });
+    }
+
+    $('#sendingAmount').keydown(function (e) {
+        if (e.which === 13) {
+            getReceivingAmount();
+        }
+    });
+</script>
+</html>
